@@ -1,0 +1,98 @@
+---
+title: "PML_Project"
+author: "JohnPCummings"
+date: "Sunday, June 21, 2015"
+output: html_document
+---
+
+## Summary
+    The analysis below is to produce answers to classes of data for a provided data set (PML_test) with 20 rows and the effort is to produce the classes for all 20 rows of data based on a training algorithm that is run against a different PML training data set. 
+    The Training data is sliced into two seperate files (training (75%) and testing (25%)) and models are created against the training data and tested against the test data prior to the final prediction of classes run against the PML_test file for final project submission. 
+    Based on the randomForest prediction data, a success rate over 99% is expected. Data was loaded with "NA","","#DIV/0!" all noted as na and columns with greater then 70% NA were dropped along with timestamp, windows, row number, and username data.  The final number variables used for the model was 53.  The models were fitted using train and rpart and randomForest.  RandomForest resulted in the more accurate prediction model and was used for the final rediction of Classes in the PML_test data.
+
+## Load Librarys
+```{r}
+library(caret)
+library(rattle)
+library(rpart)
+library(rpart.plot)
+library(randomForest)
+## Load Data
+```{r}
+traindata<-read.csv("pml-training.csv",na.strings=c("NA","","#DIV/0!"))
+dim(traindata)
+```
+
+
+## Clean Data
+```{r}
+traindata<-traindata[,colSums(is.na(traindata))<0.70*nrow(traindata)]
+dim(traindata)
+columndrop<- c("X", "user_name","raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp","new_window","num_window")
+traindata<- traindata[,!(names(traindata) %in% columndrop)] 
+dim(traindata)
+```
+
+
+## Slice Data for training and test sets
+```{r}
+inTrain<-createDataPartition(y=traindata$classe,p=0.75, list=FALSE)
+training<-traindata[inTrain,]
+test<-traindata[-inTrain,]
+dim(training); dim(test)
+```
+
+
+## Train Data (defaults used)
+```{r}
+TC<-trainControl(method="cv")
+```
+## Modelfit Classification Tree
+```{r}
+modelfitrp<-train(classe~.,method="rpart", trControl = TC, data=training)
+```
+## Modelfit Random Forest
+```{r}
+modelfitrf<-train(classe~.,method="rf", trControl = TC, data=training)
+```
+## Review of Classification Tree
+```{r}
+fancyRpartPlot(modelfitrp$finalModel)
+```
+##  Highest probability for Class A at 44% (not good)
+
+## Prediction with Classification Tree
+```{r}
+predictorrp<-predict(modelfitrp, newdata=test[,-53])
+```
+
+## Prediction with Random Forest
+```{r}
+predictorrf<-predict(modelfitrf, newdata=test[,-53])
+```
+
+## Show predictionw with Classification
+```{r}
+confusionMatrix(test$classe, predictorrp)
+```
+
+## 49 % Accuracy; snesitivity NA for Class D and below 50% for Class A, B, C.  Class E only Sensitivity rate over 90%
+## Not acceptable, move onto Random Forest.
+```{r}
+confusionMatrix(test$classe, predictorrf)
+```
+## 99.5 % Accuracy; Sensitivity close to 99% for Class C and over 99% for all other classes.  Very nice resutls.
+## Random Forest model will be used for final prediction of pml-testing data.
+
+## Load PML-Test Data for final prediction
+```{r}
+pmltest<-read.csv("pml-testing.csv",na.strings=c("NA","","#DIV/0!"))
+```
+## Run prediction from Random Forest model on PML test data.
+```{r}
+answers<-predict(modelfitrf,pmltest)
+```
+## Print prediction results
+```{r}
+answers
+```
